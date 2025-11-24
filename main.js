@@ -1,167 +1,159 @@
-// =====================================================================
-// 매장 지도 렌더링 + 상품 검색 기능 통합 JS (최신 통합본)
-// =====================================================================
+// main.js
 
-// ---------------------------
-// 1. 캔버스 설정
-// ---------------------------
+// ===== 기본 설정 =====
 const canvas = document.getElementById("mapCanvas");
 const ctx = canvas.getContext("2d");
-
-// 선반 크기
-const SHELF_WIDTH = 300;
-const SHELF_HEIGHT = 30;
-
-// 현재 QR 위치값
-let currentLocation = null;
-
-
-// ---------------------------
-// 2. URL 파라미터로 loc 읽기
-// 예: ?loc=3-2
-// ---------------------------
-function getCurrentLocationFromURL() {
-    const params = new URLSearchParams(window.location.search);
-    if (params.has("loc")) {
-        const loc = params.get("loc");
-        const [shelf, row] = loc.split("-").map(Number);
-
-        if (!isNaN(shelf) && !isNaN(row)) {
-            currentLocation = { shelf, row };
-
-            const info = document.getElementById("current-location");
-            if (info) info.textContent = `현재 위치: 선반 ${shelf} / 줄 ${row}`;
-        }
-    }
-}
-
-
-// ---------------------------
-// 3. 지도 그리기 (업그레이드 버전)
-// ---------------------------
-function drawMap() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    ctx.font = "16px Arial";
-    ctx.textAlign = "center";
-
-    // ===== 계산대 (왼쪽 세로) =====
-    ctx.fillStyle = "#ffe4e1";
-    ctx.fillRect(40, 100, 90, 300);
-    ctx.strokeRect(40, 100, 90, 300);
-    ctx.fillStyle = "#000";
-    ctx.fillText("계산대", 85, 250);
-
-    // ===== 입구 (위) =====
-    ctx.fillStyle = "#f9f9b0";
-    ctx.fillRect(250, 20, 140, 30);
-    ctx.strokeRect(250, 20, 140, 30);
-    ctx.fillStyle = "#000";
-    ctx.fillText("입구", 320, 42);
-
-    // ===== 입구 (아래) =====
-    ctx.fillStyle = "#f9f9b0";
-    ctx.fillRect(250, 650, 140, 30);
-    ctx.strokeRect(250, 650, 140, 30);
-    ctx.fillStyle = "#000";
-    ctx.fillText("입구", 320, 672);
-
-    // ===== 선반 1~10 표시 =====
-    for (let i = 1; i <= 10; i++) {
-        const pos = shelfPositions[i];
-
-        // 선반 본체
-        ctx.fillStyle = "#e7f0ff";
-        ctx.fillRect(pos.x - SHELF_WIDTH / 2, pos.y, SHELF_WIDTH, SHELF_HEIGHT);
-        ctx.strokeRect(pos.x - SHELF_WIDTH / 2, pos.y, SHELF_WIDTH, SHELF_HEIGHT);
-
-        // 선반 번호
-        ctx.fillStyle = "#000";
-        ctx.fillText(`${i}번 선반`, pos.x, pos.y - 8);
-
-        // 선반의 줄(row) 1~4 표시
-        ctx.font = "12px Arial";
-        ctx.fillStyle = "#444";
-        const baseX = pos.x - SHELF_WIDTH / 2 + 30;
-        for (let r = 1; r <= 4; r++) {
-            ctx.fillText(`줄${r}`, baseX + (r - 1) * 70, pos.y + 22);
-        }
-        ctx.font = "16px Arial";
-    }
-
-    // ===== 현재 위치 표시(파란 점) =====
-    if (currentLocation) {
-        const pos = shelfPositions[currentLocation.shelf];
-        ctx.fillStyle = "blue";
-        ctx.beginPath();
-        ctx.arc(pos.x, pos.y + SHELF_HEIGHT / 2, 7, 0, Math.PI * 2);
-        ctx.fill();
-    }
-}
-
-
-// ---------------------------
-// 4. 검색 자동완성 기능
-// ---------------------------
-const input = document.getElementById("search-input");
+const currentLocationText = document.getElementById("current-location");
+const searchInput = document.getElementById("search-input");
 const autocompleteBox = document.getElementById("autocomplete");
 
-input.addEventListener("input", () => {
-    const keyword = input.value.trim();
-    autocompleteBox.innerHTML = "";
+const STORE_WIDTH = 360;
+const STORE_HEIGHT = 480;
 
-    if (keyword.length === 0) return;
+// 선반 레이아웃 (1~10번, 4줄, 간격 1m 가정)
+const SHELF_COUNT = 10;
+const ROW_COUNT = 4;
 
-    const results = productData.filter(p =>
-        p.name.includes(keyword)
-    );
+// 캔버스 좌표계에서 선반 위치 계산
+// (단순하게 왼쪽에서 오른쪽으로 1~10번, 위에서 아래로 줄 1~4)
+function getShelfPosition(shelf, row) {
+  const marginX = 20;
+  const marginY = 80;
+  const shelfWidth = 20;
+  const shelfHeight = 50;
+  const gapX = (STORE_WIDTH - marginX * 2 - shelfWidth * SHELF_COUNT) / (SHELF_COUNT - 1);
+  const gapY = 20; // 줄 간격 비율용 (대략)
 
-    results.forEach(item => {
-        const div = document.createElement("div");
-        div.className = "auto-item";
-        div.innerText = item.name;
-        div.onclick = () => selectProduct(item);
-        autocompleteBox.appendChild(div);
-    });
-});
-
-
-// ---------------------------
-// 5. 검색 선택 시 지도에 표시
-// ---------------------------
-function selectProduct(item) {
-    autocompleteBox.innerHTML = "";
-    input.value = item.name;
-
-    const pos = shelfPositions[item.shelf];
-
-    drawMap();
-
-    // 빨간 점 표시
-    ctx.fillStyle = "red";
-    ctx.beginPath();
-    ctx.arc(pos.x, pos.y + SHELF_HEIGHT / 2, 10, 0, Math.PI * 2);
-    ctx.fill();
-
-    // 거리 계산
-    let message = `${item.name}\n선반 ${item.shelf} / 줄 ${item.row}`;
-
-    if (currentLocation) {
-        const diff = Math.abs(item.shelf - currentLocation.shelf);
-
-        if (diff === 0) {
-            message += "\n(현재 위치와 같은 선반입니다!)";
-        } else {
-            message += `\n현재 위치에서 약 ${diff}칸 떨어져 있습니다.`;
-        }
-    }
-
-    alert(message);
+  const x = marginX + (shelf - 1) * (shelfWidth + gapX) + shelfWidth / 2;
+  const y = marginY + (row - 1) * (shelfHeight + gapY) + shelfHeight / 2;
+  return { x, y, shelfWidth, shelfHeight };
 }
 
+// ===== 현재 위치: QR 파라미터에서만 가져오기 =====
+let currentShelf = null;
+let currentRow = null;
 
-// ---------------------------
-// 6. 초기 실행
-// ---------------------------
-getCurrentLocationFromURL();
+function updateCurrentLocationFromQR() {
+  const params = new URLSearchParams(window.location.search);
+  const loc = params.get("loc");
+
+  if (!loc) {
+    currentLocationText.textContent = "현재 위치: QR 코드를 스캔하면 표시됩니다.";
+    return;
+  }
+
+  const [shelfStr, rowStr] = loc.split("-");
+  const shelf = Number(shelfStr);
+  const row = Number(rowStr);
+
+  if (!shelf || !row || shelf < 1 || shelf > SHELF_COUNT || row < 1 || row > ROW_COUNT) {
+    currentLocationText.textContent = "현재 위치: 알 수 없음 (QR 정보 오류)";
+    return;
+  }
+
+  currentShelf = shelf;
+  currentRow = row;
+  currentLocationText.textContent = `현재 위치: ${shelf}번 선반, ${row}줄`;
+}
+
+// ===== 매장 지도 그리기 =====
+function drawMap() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // 배경
+  ctx.fillStyle = "#f5f9ff";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // 출입구 & 계산대 (대략적인 위치)
+  ctx.fillStyle = "#ffe66d";
+  ctx.fillRect(0, canvas.height - 40, canvas.width * 0.6, 30); // 아래 출입구
+  ctx.fillRect(20, 80, 40, 180); // 왼쪽 계산대
+
+  // 출입구 글자
+  ctx.fillStyle = "#000";
+  ctx.font = "14px sans-serif";
+  ctx.fillText("입구", 25, canvas.height - 50);
+  ctx.fillText("계산대", 24, 70);
+
+  // 선반들
+  ctx.fillStyle = "#bbbbbb";
+  for (let s = 1; s <= SHELF_COUNT; s++) {
+    for (let r = 1; r <= ROW_COUNT; r++) {
+      const { x, y, shelfWidth, shelfHeight } = getShelfPosition(s, r);
+      ctx.fillRect(x - shelfWidth / 2, y - shelfHeight / 2, shelfWidth, shelfHeight);
+    }
+  }
+
+  // 현재 위치 (파란 점)
+  if (currentShelf && currentRow) {
+    const { x, y } = getShelfPosition(currentShelf, currentRow);
+    ctx.beginPath();
+    ctx.arc(x, y, 8, 0, Math.PI * 2);
+    ctx.fillStyle = "#007bff";
+    ctx.fill();
+  }
+}
+
+// ===== 약품 검색 =====
+
+// data.js 에서 medicines 배열을 가져온다고 가정
+// 예시:
+// const medicines = [
+//   { name: "타이레놀 500mg", shelf: 3, row: 2, position: 1 },
+//   ...
+// ];
+
+function searchMedicines(keyword) {
+  keyword = keyword.trim();
+  if (!keyword) return [];
+
+  const lower = keyword.toLowerCase();
+  return medicines.filter((m) => m.name.toLowerCase().includes(lower));
+}
+
+function renderAutocomplete(list) {
+  autocompleteBox.innerHTML = "";
+  if (!list.length) {
+    autocompleteBox.style.display = "none";
+    return;
+  }
+
+  list.forEach((item) => {
+    const div = document.createElement("div");
+    div.className = "autocomplete-item";
+    div.textContent = `${item.name} (선반 ${item.shelf}, 줄 ${item.row})`;
+    div.addEventListener("click", () => {
+      focusOnMedicine(item);
+      autocompleteBox.innerHTML = "";
+      autocompleteBox.style.display = "none";
+      searchInput.value = item.name;
+    });
+    autocompleteBox.appendChild(div);
+  });
+  autocompleteBox.style.display = "block";
+}
+
+// 약 선택 시 해당 위치에 빨간 점 표시
+let focusedMedicine = null;
+
+function focusOnMedicine(med) {
+  focusedMedicine = med;
+  drawMap();
+
+  const { x, y } = getShelfPosition(med.shelf, med.row);
+  ctx.beginPath();
+  ctx.arc(x, y, 8, 0, Math.PI * 2);
+  ctx.fillStyle = "#ff3b3b";
+  ctx.fill();
+}
+
+// 검색 입력 이벤트
+searchInput.addEventListener("input", () => {
+  const keyword = searchInput.value;
+  const res = searchMedicines(keyword);
+  renderAutocomplete(res);
+});
+
+// ===== 초기 실행 =====
+updateCurrentLocationFromQR();
 drawMap();
