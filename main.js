@@ -1,5 +1,5 @@
 // =====================================================================
-// 검단태평양약국 매장 지도 + 상품 검색 통합 스크립트 (tags 검색 반영 버전)
+// 검단태평양약국 매장 지도 + 상품 검색 통합 스크립트 (tags 검색 + 사람모양 현재위치)
 // =====================================================================
 
 // ---------------------------
@@ -92,14 +92,36 @@ function drawMap() {
     ctx.font = "16px Arial";
   }
 
-  // ===== 현재 위치 표시(파란 점) =====
+  // ===== 현재 위치 표시 (사람 모양) =====
   if (currentLocation) {
     const pos = shelfPositions[currentLocation.shelf];
     if (pos) {
+      const cx = pos.x;
+      const cy = pos.y + SHELF_HEIGHT / 2;
+
+      // 머리
       ctx.fillStyle = "blue";
       ctx.beginPath();
-      ctx.arc(pos.x, pos.y + SHELF_HEIGHT / 2, 7, 0, Math.PI * 2);
+      ctx.arc(cx, cy - 12, 6, 0, Math.PI * 2);
       ctx.fill();
+
+      // 몸통
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - 6);
+      ctx.lineTo(cx - 6, cy + 10);
+      ctx.lineTo(cx + 6, cy + 10);
+      ctx.closePath();
+      ctx.fill();
+
+      // 다리 (옵션)
+      ctx.beginPath();
+      ctx.moveTo(cx - 3, cy + 10);
+      ctx.lineTo(cx - 3, cy + 18);
+      ctx.moveTo(cx + 3, cy + 10);
+      ctx.lineTo(cx + 3, cy + 18);
+      ctx.strokeStyle = "blue";
+      ctx.lineWidth = 2;
+      ctx.stroke();
     }
   }
 }
