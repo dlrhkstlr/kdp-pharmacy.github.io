@@ -6,32 +6,39 @@
     name="viewport"
     content="width=device-width, initial-scale=1.0"
   />
-  <title>검단아라 태평양약국 상품 위치 안내</title>
+  <title>검단 아라태평양약국 상품 위치 안내</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <div class="app-wrapper">
     <div class="page-container">
       <header>
-        <h1>검단아라 태평양약국 상품 위치 안내</h1>
+        <h1>검단 아라태평양약국 상품 위치 안내</h1>
         <p id="current-location">
           현재 위치: QR 코드를 스캔하면 표시됩니다.
         </p>
       </header>
 
+      <!-- 검색 입력 -->
       <section id="search-section">
         <input
           id="search-input"
           type="text"
-          placeholder="약품 이름을 입력하세요 (예: 타이레놀)"
+          placeholder="약품 이름 또는 증상/효능을 입력하세요 (예: 타이레놀, 해열제, 소화제)"
           autocomplete="off"
         />
+        <!-- 자동완성 박스(지금은 안 써도 괜찮음, 나중에 확장용) -->
         <div id="autocomplete"></div>
       </section>
 
+      <!-- 검색 결과 안내 문구 -->
+      <section id="result-section">
+        <p id="result-text">약품을 검색하면 위치 안내가 표시됩니다.</p>
+      </section>
+
+      <!-- 매장 지도 -->
       <section id="map-section">
         <h2>매장 지도</h2>
-        <!-- 캔버스 크기는 JS에서 그대로 가져다 씀 -->
         <canvas id="mapCanvas" width="400" height="720">
           브라우저가 canvas를 지원하지 않습니다.
         </canvas>
@@ -39,9 +46,9 @@
     </div>
   </div>
 
-  <!-- 약품 데이터 / 선반 정보 -->
+  <!-- 약품 데이터 -->
   <script src="data.js"></script>
-  <!-- 지도 그리기 + 검색/QR 로직 -->
+  <!-- 지도 + 검색 로직 -->
   <script src="main.js"></script>
 </body>
 </html>
